@@ -5,6 +5,6 @@ namespace OverTheTopRealism
     {
         public const string GUID    = "overthetoprealism.casualtiesunknown.mod";
         public const string NAME    = "Over-the-top Realism";
-        public const string VERSION = "1.0.0";
+        public const string VERSION = "1.0.1";
     }
 }

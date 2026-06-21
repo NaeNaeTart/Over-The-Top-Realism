@@ -11,6 +11,7 @@ namespace OverTheTopRealism.Features
         public ConfigEntry<bool> CardioStrainEnabled { get; }
         public ConfigEntry<float> StrokeRiskThreshold { get; }
         public ConfigEntry<float> StrokeBuildRate { get; }
+        public ConfigEntry<float> StrokeFibrillationChance { get; }
 
         // ─── Trauma / Fractures ──────────────────────────────────────────────
         public ConfigEntry<bool> LegFractureStrainEnabled { get; }
@@ -52,11 +53,13 @@ namespace OverTheTopRealism.Features
         // ─── Splint Failures & Compound Fractures (New) ──────────────────────
         public ConfigEntry<bool> CompoundFracturesEnabled { get; }
         public ConfigEntry<float> SplintBreakChance { get; }
+        public ConfigEntry<float> CompoundFractureChance { get; }
 
         // ─── Drug Realism (New) ──────────────────────────────────────────────
         public ConfigEntry<bool> DrugRealismEnabled { get; }
         public ConfigEntry<bool> DrugWithdrawalEnabled { get; }
         public ConfigEntry<bool> DrugOverdoseEnabled { get; }
+        public ConfigEntry<float> StimulantFibrillationChance { get; }
 
         public ModConfig(ConfigFile cfg)
         {
@@ -75,8 +78,12 @@ namespace OverTheTopRealism.Features
                 "The heart rate (bpm) above which stroke risk starts accumulating.");
 
             StrokeBuildRate = cfg.Bind(
-                "1. Cardiovascular Strain", "StrokeBuildRate", 0.05f,
+                "1. Cardiovascular Strain", "StrokeBuildRate", 0.015f,
                 "Rate at which stroke damage builds up per second when heart rate is critically high.");
+
+            StrokeFibrillationChance = cfg.Bind(
+                "1. Cardiovascular Strain", "StrokeFibrillationChance", 0.001f,
+                "Probability per second (multiplied by Time.deltaTime) of sudden cardiac arrest when stroke risk is critically high (>60%).");
 
             // ── Trauma ──
             LegFractureStrainEnabled = cfg.Bind(
@@ -84,11 +91,11 @@ namespace OverTheTopRealism.Features
                 "If enabled, walking or landing with broken leg bones causes traumatic sharp pain spikes, shock, and further muscle damage.");
 
             FracturePainSpike = cfg.Bind(
-                "2. Trauma & Fractures", "FracturePainSpike", 1.8f,
+                "2. Trauma & Fractures", "FracturePainSpike", 0.4f,
                 "Pain spike value added to limbs when stepping on broken legs.");
 
             FractureShockSpike = cfg.Bind(
-                "2. Trauma & Fractures", "FractureShockSpike", 2.2f,
+                "2. Trauma & Fractures", "FractureShockSpike", 0.5f,
                 "Physical shock added per step when leg bones are fractured.");
 
             // ── Hemodynamics ──
@@ -172,6 +179,10 @@ namespace OverTheTopRealism.Features
                 "11. Splints & Compound Fractures", "SplintBreakChance", 0.40f,
                 "Probability (0.0 to 1.0) that a heavy fall breaks a limb's splint.");
 
+            CompoundFractureChance = cfg.Bind(
+                "11. Splints & Compound Fractures", "CompoundFractureChance", 0.002f,
+                "Probability per second of walking on an unsplinted fracture that it becomes a compound fracture.");
+
             // ── Drug Realism (New) ──
             DrugRealismEnabled = cfg.Bind(
                 "12. Drug Realism", "DrugRealismEnabled", true,
@@ -184,6 +195,10 @@ namespace OverTheTopRealism.Features
             DrugOverdoseEnabled = cfg.Bind(
                 "12. Drug Realism", "DrugOverdoseEnabled", true,
                 "If enabled, painkiller overdoses can depress respiration leading to asphyxiation, or cause sudden cardiac arrest.");
+
+            StimulantFibrillationChance = cfg.Bind(
+                "12. Drug Realism", "StimulantFibrillationChance", 0.02f,
+                "Probability that a stimulant-induced arrhythmia event deteriorates into fatal Ventricular Fibrillation (cardiac arrest).");
         }
     }
 }

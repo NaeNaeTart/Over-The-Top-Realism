@@ -11,6 +11,7 @@ namespace OverTheTopRealism.Features
         // ─── Persistence Vitals ──────────────────────────────────────────────
         private static float _concussionTimer = 0f;
         private static float _crampCooldown = 0f;
+        private static float _microNapCooldown = 0f;
         private static HashSet<string> _compoundFractures = new HashSet<string>();
 
         // ─── Helper to identify if Body is the local player ──────────────────
@@ -51,7 +52,7 @@ namespace OverTheTopRealism.Features
                 __instance.strokeAmount = Mathf.Clamp(__instance.strokeAmount + strokeDelta, 0f, 100f);
 
                 // If stroke risk is critically high, introduce arrhythmia or trigger V-Fib (cardiac arrest)
-                if (__instance.strokeAmount > 60f && UnityEngine.Random.value < (0.015f * Time.deltaTime))
+                if (__instance.strokeAmount > 60f && UnityEngine.Random.value < (Plugin.Cfg.StrokeFibrillationChance.Value * Time.deltaTime))
                 {
                     Plugin.Logger.LogWarning($"[Realism] Critically high stroke level ({__instance.strokeAmount:F1}%) caused sudden cardiovascular fibrillation!");
                     __instance.TryStartFibrillation(forced: true);
@@ -98,7 +99,11 @@ namespace OverTheTopRealism.Features
                             float painSpike = Plugin.Cfg.FracturePainSpike.Value * Time.deltaTime * 6f;
                             float shockSpike = Plugin.Cfg.FractureShockSpike.Value * Time.deltaTime * 4f;
 
-                            limb.pain = Mathf.Clamp(limb.pain + painSpike, 0f, 100f);
+                            float maxFracturePain = limb.splinted ? 40f : 85f;
+                            if (limb.pain < maxFracturePain)
+                            {
+                                limb.pain = Mathf.Clamp(limb.pain + painSpike, 0f, maxFracturePain);
+                            }
                             __instance.shock = Mathf.Clamp(__instance.shock + shockSpike, 0f, 100f);
 
                             // Walking on broken legs degrades muscle health (tissue tearing)
@@ -110,8 +115,8 @@ namespace OverTheTopRealism.Features
                             // Walking on an UNsplinted fractured leg has a chance to trigger a Compound Fracture!
                             if (Plugin.Cfg.CompoundFracturesEnabled.Value && !limb.splinted)
                             {
-                                // 5% chance per second of walking to worsen simple fracture into compound fracture
-                                if (UnityEngine.Random.value < (0.05f * Time.deltaTime))
+                                // Configurable chance per second of walking to worsen simple fracture into compound fracture
+                                if (UnityEngine.Random.value < (Plugin.Cfg.CompoundFractureChance.Value * Time.deltaTime))
                                 {
                                     Plugin.Logger.LogWarning($"[Realism] Unsplinted bone in {limb.fullName} tore through skin! COMPOUND FRACTURE!");
                                     limb.bleedAmount = Mathf.Max(limb.bleedAmount, 50f); // Severe immediate hemorrhaging
@@ -152,7 +157,8 @@ namespace OverTheTopRealism.Features
             }
 
             // ── 3. Sleep Deprivation / Fatigue Micro-Naps ──
-            if (Plugin.Cfg.FatigueNapsEnabled.Value && __instance.energy < Plugin.Cfg.MicroNapThreshold.Value && __instance.conscious)
+            _microNapCooldown -= Time.deltaTime;
+            if (Plugin.Cfg.FatigueNapsEnabled.Value && __instance.energy < Plugin.Cfg.MicroNapThreshold.Value && __instance.conscious && _microNapCooldown <= 0f)
             {
                 float movementIntensity = Mathf.Abs(__instance.moveDir.x) + Mathf.Abs(__instance.moveDir.y);
                 if (movementIntensity > 0.1f)
@@ -165,6 +171,7 @@ namespace OverTheTopRealism.Features
                         Plugin.Logger.LogWarning($"[Realism] Fatigue blackout! Player collapsed into a micro-nap (Energy: {__instance.energy:F1}%).");
                         __instance.consciousness = 0f;
                         __instance.Ragdoll();
+                        _microNapCooldown = 45f; // 45 seconds of grace period after waking up before another micro-nap can trigger
                     }
                 }
             }
@@ -428,7 +435,7 @@ namespace OverTheTopRealism.Features
                         __instance.stamina = Mathf.Max(0f, __instance.stamina - 25f);
                         __instance.shock = Mathf.Clamp(__instance.shock + 15f, 0f, 100f);
 
-                        if (stimulantLvl > 90f && UnityEngine.Random.value < 0.15f)
+                        if (stimulantLvl > 90f && UnityEngine.Random.value < Plugin.Cfg.StimulantFibrillationChance.Value)
                         {
                             Plugin.Logger.LogError($"[Realism] Arrhythmia deteriorated into Ventricular Fibrillation (cardiac arrest)!");
                             __instance.TryStartFibrillation(forced: true);
@@ -480,7 +487,15 @@ namespace OverTheTopRealism.Features
                 float vanillaClotting = Time.deltaTime * body.bleedClottingSpeed * (__instance.hasShrapnel ? 0f : 1f) * WorldGeneration.GetRunSettingFloat("healingrate");
 
                 // Partially or fully negate clotting during physical strain to simulate wound opening
-                float clottingnegation = isFlopOrRagdoll ? 1.0f : 0.75f; // Flopping completely ruins clotting; moving negates 75% of it
+                float clottingnegation = 0f;
+                if (isFlopOrRagdoll)
+                {
+                    clottingnegation = 1.0f; // Flopping completely ruins clotting
+                }
+                else if (isMoving)
+                {
+                    clottingnegation = movement > 1.0f ? 0.70f : 0.25f; // Sprinting/running vs standard walking input
+                }
 
                 __instance.bleedAmount = Mathf.Clamp(__instance.bleedAmount + (vanillaClotting * clottingnegation), 0f, 100f - __instance.skinHealth);
             }
